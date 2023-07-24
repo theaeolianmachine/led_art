@@ -54,7 +54,13 @@
 // #define PETAL_OFFSET 45
 
 // Burrow Rose Large / Tall
-#define PETAL_OFFSET 59
+// #define PETAL_OFFSET 59
+
+// Steamship Rose Medium
+#define PETAL_OFFSET 46
+
+// Steamship Rose Large / Tall
+// #define PETAL_OFFSET 55
 
 // Number of LED's On Strip
 #define NUM_LEDS (PETAL_OFFSET + 240)
@@ -659,19 +665,19 @@ void blackout() {
 
 PatternArray patterns = {
     // Chill Night
-    // pulsePattern,
-    // ringsHSVPattern,
-    // ringsRainbowPattern,
-    // ringsGroupPattern,
-    // twinklePattern,
+    pulsePattern,
+    ringsHSVPattern,
+    ringsRainbowPattern,
+    ringsGroupPattern,
+    twinklePattern,
 
     // Beats Night
-    ringPulsePatternGroup,
-    ringPulsePatternRainbow,
-    ringPulsePatternHSV,
-    convergeRainbow,
-    convergeHSV,
-    beatSyncMultiplesPattern,
+    // ringPulsePatternGroup,
+    // ringPulsePatternRainbow,
+    // ringPulsePatternHSV,
+    // convergeRainbow,
+    // convergeHSV,
+    // beatSyncMultiplesPattern,
 };
 
 // Length of patterns[]
