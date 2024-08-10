@@ -1,13 +1,37 @@
 #include <FastLED.h>
 
-#define BRIGHTNESS 64
 #define DATA_PIN 0
-#define NUM_RINGS 3
-#define NUM_COLORS 8
-#define NUM_SHADES 4
-#define NUM_LEDS 19
+
 #define BASE_HUE 0
 #define BASE_VALUE 255
+#define BRIGHTNESS 64
+#define NUM_COLORS 8
+#define NUM_LEDS 19
+#define NUM_RINGS 3
+
+// ========
+// Typedefs
+// ========
+
+// Typedef to make function pointer array easier to type.
+typedef void (*PatternArray[])();
+
+// ========================
+// Time Syncing Definitions
+// ========================
+
+// Frames Per Second
+#define FPS 120
+
+// Amount of time to show each pattern
+#define PATTERN_SECS 12
+
+// ================
+// Global Variables
+// ================
+
+CRGB leds[NUM_LEDS];
+uint8_t currentPattern; // Index of currently selected pattern
 
 const CHSVPalette16 PENDANT_COLORS(
     // Red
@@ -40,22 +64,17 @@ const CHSVPalette16 PENDANT_COLORS(
 
     // Violet
     CHSV(231, 255, 205),
-    CHSV(231, 155, 217)
-);
+    CHSV(231, 155, 217));
 
-CRGB leds[NUM_LEDS];
-
-void setup() {
-    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-    FastLED.setBrightness(BRIGHTNESS);
-}
-
-void colorFlow() {
+void colorFlow()
+{
     // TODO: Adjust this pattern for the new format.
     uint16_t dot, index, colorIndex;
-    for (index = 0; index < 256; ++index) {
+    for (index = 0; index < 256; ++index)
+    {
         colorIndex = index;
-        for (dot = 0; dot < NUM_LEDS; ++dot) {
+        for (dot = 0; dot < NUM_LEDS; ++dot)
+        {
             leds[dot] = ColorFromPalette(
                 PENDANT_COLORS, colorIndex, BASE_VALUE, LINEARBLEND);
             colorIndex += 2;
@@ -65,16 +84,21 @@ void colorFlow() {
     }
 }
 
-void lightFirstFourLEDS(uint16_t color, uint8_t offset) {
+void lightFirstFourLEDS(uint16_t color, uint8_t offset)
+{
     // TODO: Adjust this pattern for the new format.
     uint8_t dot;
     uint16_t colorIndex;
-    for (dot = 0; dot < NUM_LEDS; ++dot) {
-        if (((dot + offset) & 7) < 4) {
+    for (dot = 0; dot < NUM_LEDS; ++dot)
+    {
+        if (((dot + offset) & 7) < 4)
+        {
             colorIndex = ((dot & 1) == 0) ? color : color + 16;
             leds[dot] = ColorFromPalette(
                 PENDANT_COLORS, colorIndex, BASE_VALUE, LINEARBLEND);
-        } else {
+        }
+        else
+        {
             leds[dot] = CRGB::Black;
         }
     }
@@ -82,37 +106,49 @@ void lightFirstFourLEDS(uint16_t color, uint8_t offset) {
     delay(75);
 }
 
-void forwardAndBackwards() {
+void forwardAndBackwards()
+{
     // TODO: Adjust this pattern for the new format.
     uint8_t dot;
     int8_t offset;
     uint16_t color;
-    for (color = 0; color < 256; color += 32) {
-        for (offset = 0; offset < NUM_LEDS; ++offset) {
+    for (color = 0; color < 256; color += 32)
+    {
+        for (offset = 0; offset < NUM_LEDS; ++offset)
+        {
             lightFirstFourLEDS(color, offset);
         }
     }
-    for (color = 0; color < 256; color += 32) {
-        for (offset = NUM_LEDS - 1; offset >= 0; --offset) {
+    for (color = 0; color < 256; color += 32)
+    {
+        for (offset = NUM_LEDS - 1; offset >= 0; --offset)
+        {
             lightFirstFourLEDS(color, offset);
         }
     }
 }
 
-void twelveToSix() {
+void twelveToSix()
+{
     // TODO: Adjust this pattern for the new format.
     uint8_t dot;
     uint16_t color;
     int8_t offset;
-    for (color = 0; color < 256; color += 4) {
-        for (offset = 0; offset < 8; ++offset) {
-            for (dot = 0; dot < (NUM_LEDS / 2); ++dot) {
-                if (((dot + offset) & 7) < 4) {
+    for (color = 0; color < 256; color += 4)
+    {
+        for (offset = 0; offset < 8; ++offset)
+        {
+            for (dot = 0; dot < (NUM_LEDS / 2); ++dot)
+            {
+                if (((dot + offset) & 7) < 4)
+                {
                     leds[dot] = ColorFromPalette(
                         PENDANT_COLORS, color, BASE_VALUE, LINEARBLEND);
                     leds[NUM_LEDS - dot - 1] = ColorFromPalette(
                         PENDANT_COLORS, color, BASE_VALUE, LINEARBLEND);
-                } else {
+                }
+                else
+                {
                     leds[dot] = CRGB::Black;
                     leds[NUM_LEDS - dot - 1] = CRGB::Black;
                 }
@@ -123,8 +159,19 @@ void twelveToSix() {
     }
 }
 
-void outward() {
-    // TODO: Add color to the loop
+// TODO: Add color to the loop
+// TODO: Code in per-frame basis
+void outward()
+{
+    static uint64_t lastTime = 0;
+    static const uint64_t animTimeMillis = 500;
+
+    uint64_t currentTime = millis();
+
+    if (lastTime + animTimeMillis <= currentTime)
+    {
+        lastTime = currentTime;
+    }
     uint8_t ringIndex;
     uint8_t dot;
     uint8_t boundaries[][2] = {
@@ -133,27 +180,84 @@ void outward() {
         {0, 11},
     };
 
-    for (ringIndex = 0; ringIndex < NUM_RINGS; ++ringIndex) {
+    for (ringIndex = 0; ringIndex < NUM_RINGS; ++ringIndex)
+    {
         uint8_t left = boundaries[ringIndex][0];
         uint8_t right = boundaries[ringIndex][1];
-        for (dot = 0; dot < NUM_LEDS; ++dot) {
-            if (dot >= left && dot <= right) {
+        for (dot = 0; dot < NUM_LEDS; ++dot)
+        {
+            if (dot >= left && dot <= right)
+            {
                 leds[dot] = CRGB::Green;
-            } else {
+            }
+            else
+            {
                 leds[dot] = CRGB::Black;
             }
         }
-        FastLED.show();
         delay(200);
+        FastLED.show();
     }
+}
+
+// =======================
+// Patterns Initialization
+// =======================
+
+/*
+ * Global list of pattern functions.
+ *
+ * Each should be the name of a function that has return type void and takes no
+ * parameters. Some patterns are repeated in order to increase their chances of
+ * showing up when the next pattern is randomly chosen.
+ */
+PatternArray patterns = {
+    // colorFlow,
+    outward,
+    // forwardAndBackwards,
+    // twelveToSix,
+};
+
+// Length of patterns[]
+const uint16_t patternsLength = sizeof(patterns) / sizeof(patterns[0]);
+
+/*
+ * Randomly changes the index of the patterns array in order to switch to the
+ * next pattern. This should be called in an EVERY_N_SECONDS macro provided by
+ * FastLED in order to dynamically change patterns.
+ */
+void nextPattern()
+{
+    uint8_t newPattern = random8(patternsLength);
+    if (patternsLength <= 1)
+    {
+        // If there's only one pattern, just leave the current one on.
+        return;
+    }
+    while (newPattern == currentPattern)
+    {
+        newPattern = random8(patternsLength);
+    }
+    currentPattern = newPattern;
+}
+
+void setup()
+{
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+    FastLED.setBrightness(BRIGHTNESS);
 }
 
 // TODO: Do a loop where the biggest ring moves clockwise, middle ring counter
 // clockwise, center just changes color.
 
-void loop() {
-    /* colorFlow(); */
-    outward();
-    /* forwardAndBackwards(); */
-    /* twelveToSix(); */
+// TODO: Add a pattern of spiraling inside and out.
+
+void loop()
+{
+    patterns[currentPattern](); // Setup one frame of a pattern
+    FastLED.show();             // Show the LED's
+    FastLED.delay(1000 / FPS);  // Add a global delay at the frame rate.
+
+    // Switch patterns every PATTERN_SECS
+    EVERY_N_SECONDS(PATTERN_SECS) { nextPattern(); }
 }
