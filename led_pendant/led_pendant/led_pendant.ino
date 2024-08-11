@@ -281,19 +281,23 @@ uint8_t getGradientHue(uint16_t led)
 
 void colorFlow()
 {
-    // TODO: Adjust this pattern for the new format.
-    uint16_t dot, index, colorIndex;
-    for (index = 0; index < 256; ++index)
+    static uint64_t lastTime = 0;
+    static const uint64_t animTimeMillis = 50;
+
+    uint64_t currentTime = millis();
+    uint16_t dot, colorIndex;
+
+    if (lastTime + animTimeMillis <= currentTime)
     {
-        colorIndex = index;
+        colorIndex = rainbowHue;
         for (dot = 0; dot < NUM_LEDS; ++dot)
         {
             leds[dot] = ColorFromPalette(
-                OriginalPendantColors_p, colorIndex, BASE_VALUE, LINEARBLEND);
-            colorIndex += 2;
+                rgbPalettes[currentRGBPalette], colorIndex, BASE_VALUE, LINEARBLEND);
+            colorIndex += 5;
         }
-        FastLED.show();
-        delay(50);
+
+        lastTime = currentTime;
     }
 }
 
@@ -492,11 +496,11 @@ void reference()
  */
 PatternArray patterns = {
     // TODO: Fix These Patterns
-    // colorFlow,
     // outward,
 
     // These are finished patterns
-    forwardsAndBackwardsPattern,
+    colorFlow,
+    // forwardsAndBackwardsPattern,
     // ringsPattern,
     // twelveToSixPattern,
     // reference,
