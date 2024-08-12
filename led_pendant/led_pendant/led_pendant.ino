@@ -21,6 +21,7 @@
 // const uint8_t ringSizes[] = {1, NUM_LEDS - MIDDLE_RING, 12};
 const uint8_t ringIndexes[] = {OUTER_RING, MIDDLE_RING, INNER_RING};
 const uint8_t ringSizes[] = {12, NUM_LEDS - MIDDLE_RING, 1};
+uint8_t ringOrder[NUM_LEDS];
 
 // ========
 // Typedefs
@@ -267,6 +268,18 @@ const uint16_t hsvPalettesLength = (sizeof(hsvPalettes) / sizeof(hsvPalettes[0])
 const uint16_t rgbPalettesLength = (sizeof(rgbPalettes) / sizeof(rgbPalettes[0]));
 
 /*
+ * Returns a random amount of entropy using an unused analogPin's input.
+ *
+ * Takes the read value of an unused analog pin, and scales it to a 16 byte
+ * range. This allows the order of animations and palettes to be more random
+ * upon first turning on the lights.
+ */
+uint16_t generate_entropy()
+{
+    return (analogRead(RANDOM_ANALOG_PIN) * 65535) / 1023;
+}
+
+/*
  * Returns a hue index that corresponds with the given LED index.
  *
  * This function smoothly interpolates over the range of [0, 255].
@@ -279,7 +292,7 @@ uint8_t getGradientHue(uint16_t led)
     return (led * 255) / (NUM_LEDS - 1);
 }
 
-void colorFlow()
+void colorFlowPattern()
 {
     static uint64_t lastTime = 0;
     static const uint64_t animTimeMillis = 50;
@@ -423,44 +436,104 @@ void ringsPattern()
     ringPulse(0, NUM_RINGS);
 }
 
-// TODO: Add color to the loop
-// TODO: Code in per-frame basis
-void outward()
+void flowerPattern()
 {
     static uint64_t lastTime = 0;
-    static const uint64_t animTimeMillis = 500;
+    static const uint64_t animTimeMillis = 180;
+    static uint8_t curRing = 0;
 
     uint64_t currentTime = millis();
 
+    fadeToBlackBy(leds, NUM_LEDS, 15);
     if (lastTime + animTimeMillis <= currentTime)
     {
-        lastTime = currentTime;
-    }
-    uint8_t ringIndex;
-    uint8_t dot;
-    uint8_t boundaries[][2] = {
-        {12, 12},
-        {13, 18},
-        {0, 11},
-    };
+        uint8_t dot;
+        uint8_t oppRing = NUM_RINGS - curRing - 1;
 
-    for (ringIndex = 0; ringIndex < NUM_RINGS; ++ringIndex)
-    {
-        uint8_t left = boundaries[ringIndex][0];
-        uint8_t right = boundaries[ringIndex][1];
+        uint8_t start = ringIndexes[oppRing];
+        uint8_t end = start + ringSizes[oppRing];
         for (dot = 0; dot < NUM_LEDS; ++dot)
         {
-            if (dot >= left && dot <= right)
+            if (dot >= start && dot < end)
             {
-                leds[dot] = CRGB::Green;
-            }
-            else
-            {
-                leds[dot] = CRGB::Black;
+                leds[dot] = ColorFromPalette(
+                    rgbPalettes[currentRGBPalette],
+                    rainbowHue + (curRing * 32),
+                    BASE_VALUE);
             }
         }
-        delay(200);
-        FastLED.show();
+        curRing = (curRing + 1) % NUM_RINGS;
+        lastTime = currentTime;
+    }
+}
+
+/*
+ * Pattern that goes the entire strip in 16 off beat sin waves.
+ */
+void beatSyncMultiplesPattern()
+{
+    fadeToBlackBy(leds, NUM_LEDS, 20);
+    CRGBPalette16 palette = rgbPalettes[currentRGBPalette];
+    for (uint16_t i = 0; i < 16; ++i)
+    {
+        uint16_t index = beatsin16(i * 2, 0, NUM_LEDS);
+        leds[index] |= ColorFromPalette(palette, i * 16, BASE_VALUE);
+    }
+}
+
+/*
+ * Turns on LED's at random, creating a sparkling pattern where LED's slowly
+ * fade to black.
+ */
+void randomSparklesPattern()
+{
+    static uint64_t lastTime = 0;
+    static uint8_t lastPos = NUM_LEDS; // Always higher than what is possible with random8(NUM_LEDS)
+    static const uint64_t animTimeMillis = 50;
+
+    uint64_t currentTime = millis();
+    uint8_t pos = random8(NUM_LEDS);
+    while (pos == lastPos)
+    {
+        pos = random8(NUM_LEDS);
+    }
+    uint8_t hue;
+
+    fadeToBlackBy(leds, NUM_LEDS, 10);
+    if (lastTime + animTimeMillis <= currentTime)
+    {
+        hue = rainbowHue;
+        leds[pos] += CHSV(hue + random8(64), 223, BASE_VALUE);
+        lastTime = currentTime;
+        lastPos = pos;
+    }
+}
+
+void spiralPattern()
+{
+    static uint64_t lastTime = 0;
+    static const uint64_t animTimeMillis = 50;
+    static uint8_t first = 0;
+    static uint8_t second = ringSizes[0];
+
+    uint64_t currentTime = millis();
+    fadeToBlackBy(leds, NUM_LEDS, 30);
+
+    if (lastTime + animTimeMillis <= currentTime)
+    {
+        leds[ringOrder[first]] = ColorFromPalette(
+            rgbPalettes[currentRGBPalette],
+            rainbowHue,
+            BASE_VALUE);
+
+        leds[ringOrder[second]] = ColorFromPalette(
+            rgbPalettes[currentRGBPalette],
+            rainbowHue,
+            BASE_VALUE);
+
+        first = (first + 1) % NUM_LEDS;
+        second = (second + 1) % NUM_LEDS;
+        lastTime = currentTime;
     }
 }
 
@@ -495,14 +568,15 @@ void reference()
  * showing up when the next pattern is randomly chosen.
  */
 PatternArray patterns = {
-    // TODO: Fix These Patterns
-    // outward,
-
-    // These are finished patterns
-    colorFlow,
-    // forwardsAndBackwardsPattern,
-    // ringsPattern,
-    // twelveToSixPattern,
+    colorFlowPattern,
+    flowerPattern,
+    forwardsAndBackwardsPattern,
+    ringsPattern,
+    ringsPattern,
+    twelveToSixPattern,
+    beatSyncMultiplesPattern,
+    randomSparklesPattern,
+    spiralPattern
     // reference,
 };
 
@@ -558,9 +632,34 @@ void nextPattern()
     }
 }
 
+void setupRingOrder()
+{
+    uint8_t orderIndex = 0;
+    for (uint8_t ringNum = 0; ringNum < NUM_RINGS; ++ringNum)
+    {
+        uint8_t start = ringIndexes[ringNum];
+        uint8_t end = start + ringSizes[ringNum];
+        for (uint8_t index = start; index < end; ++index)
+        {
+            ringOrder[orderIndex++] = index;
+        }
+    }
+}
+
 void setup()
 {
     Serial.begin(9600);
+
+    // Add some entropy to initial random FastLED seed
+    random16_add_entropy(generate_entropy());
+
+    // Initialize starting patterns and palettes
+    currentPattern = random8(patternsLength);
+    currentHSVPalette = random8(hsvPalettesLength);
+    currentRGBPalette = random8(rgbPalettesLength);
+
+    setupRingOrder();
+
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     FastLED.setBrightness(BRIGHTNESS);
 }
