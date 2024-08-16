@@ -13,7 +13,7 @@ FPS = 120
 GAMMA = 2.6  # For perceptually-linear brightness
 MAX_BRIGHTNESS = 245
 PATTERN_LENGTH = 24
-PINS = (13, 14, 15)  # List of pins, one per nOOd
+PINS = (6, 7, 12, 13, 14, 15)  # List of pins, one per nOOd
 
 # Instantiate AW9523 on STEMMA I2C bus. This was tested on QT Py RP2040.
 # Other boards might require board.I2C() instead of board.STEMMA_I2C().
@@ -61,7 +61,7 @@ def make_sequence_pattern():
         current_time = time.monotonic()
         for pin in PINS:
             old_brightness = pin_brightness[pin]
-            new_brightness = old_brightness * 0.98  # darken by 2%
+            new_brightness = old_brightness * 0.99  # darken by 1%
             gc_new_brightness = int(
                 (((new_brightness / MAX_BRIGHTNESS) ** GAMMA) * MAX_BRIGHTNESS) + 0.5
             )
