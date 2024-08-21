@@ -6,21 +6,28 @@
 #define BASE_VALUE 255
 #define BRIGHTNESS 64
 #define NUM_COLORS 8
-#define NUM_LEDS 19
 #define NUM_RINGS 3
 #define RANDOM_ANALOG_PIN 1
 
+// 12 LED Ring
+#define LED_RING_SIZE 12
+#define NUM_LEDS 19
 #define INNER_RING 12
 #define MIDDLE_RING 13
 #define OUTER_RING 0
 
+// 16 LED Ring
+// #define LED_RING_SIZE 16
+// #define NUM_LEDS 23
+// #define INNER_RING 16
+// #define MIDDLE_RING 17
+// #define OUTER_RING 0
+
 // Amount of time between each hue in rainbow
 #define RAINBOW_MILLIS 20
 
-// const uint8_t ringIndexes[] = {INNER_RING, MIDDLE_RING, OUTER_RING};
-// const uint8_t ringSizes[] = {1, NUM_LEDS - MIDDLE_RING, 12};
 const uint8_t ringIndexes[] = {OUTER_RING, MIDDLE_RING, INNER_RING};
-const uint8_t ringSizes[] = {12, NUM_LEDS - MIDDLE_RING, 1};
+const uint8_t ringSizes[] = {LED_RING_SIZE, NUM_LEDS - MIDDLE_RING, 1};
 uint8_t ringOrder[NUM_LEDS];
 
 // ========
@@ -292,6 +299,32 @@ uint8_t getGradientHue(uint16_t led)
     return (led * 255) / (NUM_LEDS - 1);
 }
 
+/*
+ * Returns a hue index that corresponds to the group index of the given LED.
+ *
+ * There are NUM_GROUPS groups, and each group number corresponds to a value
+ * over [0, 255]; this function returns the discrete value that corresponds
+ * with a given LED's group. For example, if LED_GROUP_SIZE == 15, led
+ * indexes [0, 14] would all return the same value, and the next hue starts at
+ * led index 15.
+ *
+ * Pre: 0 <= led < NUM_LEDS
+ * Returns: 0 <= groupHue <= 255
+ */
+uint8_t getGroupHue(uint16_t led)
+{
+    uint16_t modLedIndex = led;
+    if (led >= MIDDLE_RING) // Assumes MIDDLE_RING > INNER_RING > OUTER_RING
+    {
+        modLedIndex = led - 1;
+    }
+    else if (led == INNER_RING)
+    {
+        modLedIndex = NUM_LEDS - 1;
+    }
+    return ((modLedIndex / 2) * 255) / (NUM_LEDS / 2);
+}
+
 void colorFlowPattern()
 {
     static uint64_t lastTime = 0;
@@ -349,7 +382,7 @@ void forwardsAndBackwardsPattern()
         uint8_t end = start + ringSizes[0];
 
         lightGroupByOffset(start, end, offset, (ringSizes[0] * 2) / 3, rainbowHue);
-        ringPulse(1, NUM_RINGS);
+        ringPulse(1, NUM_RINGS, false);
 
         offset = forwards ? offset + 1 : offset - 1;
 
@@ -383,7 +416,7 @@ void twelveToSixPattern()
         twelveToSixRing(ringIndexes[0], ringIndexes[0] + ringSizes[0], offset, (ringSizes[0] * 2) / 3, curHue);
 
         // Inner Rings
-        ringPulse(1, NUM_RINGS);
+        ringPulse(1, NUM_RINGS, false);
 
         offset++;
         lastTime = currentTime;
@@ -411,7 +444,7 @@ void twelveToSixRing(uint8_t start, uint8_t end, uint8_t offset, uint8_t groupSi
     }
 }
 
-void ringPulse(uint8_t startRing, uint8_t endRing)
+void ringPulse(uint8_t startRing, uint8_t endRing, bool groupHues)
 {
     uint8_t currentHue = rainbowHue;
     uint8_t phaseOffset;
@@ -421,11 +454,20 @@ void ringPulse(uint8_t startRing, uint8_t endRing)
         uint8_t endLed = startLed + ringSizes[ringNum];
         for (uint8_t i = startLed; i < endLed; ++i)
         {
-            uint8_t hue = currentHue + (ringNum * 16);
+            uint8_t hue;
             phaseOffset = ringNum * 64;
+            if (groupHues)
+            {
+                // hue = getGroupHue(i) + (ringNum * 16);
+                hue = getGroupHue(i);
+            }
+            else
+            {
+                hue = currentHue + (ringNum * 16);
+            }
             leds[i] = ColorFromPalette(
                 rgbPalettes[currentRGBPalette],
-                currentHue + (ringNum * 16),
+                hue,
                 beatsin8(60, 0, 255, 0, phaseOffset));
         }
     }
@@ -433,7 +475,12 @@ void ringPulse(uint8_t startRing, uint8_t endRing)
 
 void ringsPattern()
 {
-    ringPulse(0, NUM_RINGS);
+    ringPulse(0, NUM_RINGS, false);
+}
+
+void ringsGroupPattern()
+{
+    ringPulse(0, NUM_RINGS, true);
 }
 
 void flowerPattern()
@@ -489,7 +536,7 @@ void randomSparklesPattern()
 {
     static uint64_t lastTime = 0;
     static uint8_t lastPos = NUM_LEDS; // Always higher than what is possible with random8(NUM_LEDS)
-    static const uint64_t animTimeMillis = 50;
+    static const uint64_t animTimeMillis = 20;
 
     uint64_t currentTime = millis();
     uint8_t pos = random8(NUM_LEDS);
@@ -537,22 +584,15 @@ void spiralPattern()
     }
 }
 
-void reference()
+void firstLightsReference()
 {
-    static uint64_t lastTime = 0;
-    static const uint64_t animTimeMillis = 1000;
-    static uint8_t currentLed = 0;
-
-    uint64_t currentTime = millis();
-    fadeToBlackBy(leds, NUM_LEDS, 20);
-
-    if (lastTime + animTimeMillis <= currentTime)
+    for (uint8_t i = 0; i < NUM_LEDS; ++i)
     {
-        CHSV hsv = ColorFromPalette(
-            OriginalPendantColors_p, getGradientHue(currentLed));
-        leds[currentLed] = hsv;
-        currentLed = (currentLed + 1) % NUM_LEDS;
-        lastTime = currentTime;
+        leds[i] = CRGB::Black;
+    }
+    for (uint8_t i = 0; i < NUM_RINGS; ++i)
+    {
+        leds[ringIndexes[i]] = CRGB::Red;
     }
 }
 
@@ -568,16 +608,16 @@ void reference()
  * showing up when the next pattern is randomly chosen.
  */
 PatternArray patterns = {
+    // firstLightsReference
     colorFlowPattern,
     flowerPattern,
     forwardsAndBackwardsPattern,
     ringsPattern,
-    ringsPattern,
+    ringsGroupPattern,
     twelveToSixPattern,
     beatSyncMultiplesPattern,
     randomSparklesPattern,
-    spiralPattern
-    // reference,
+    spiralPattern,
 };
 
 // Length of patterns[]
@@ -663,11 +703,6 @@ void setup()
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
     FastLED.setBrightness(BRIGHTNESS);
 }
-
-// TODO: Do a loop where the biggest ring moves clockwise, middle ring counter
-// clockwise, center just changes color.
-
-// TODO: Add a pattern of spiraling inside and out.
 
 void loop()
 {
